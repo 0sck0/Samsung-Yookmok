@@ -6,7 +6,7 @@
 extern int width, height;
 extern int terminateAI;
 extern unsigned s_time;
-extern int enemyLog[2][2];
+
 extern FILE *fp;
 
 
@@ -23,3 +23,16 @@ extern void writeLog(char *log);
 
 void myturn(int cnt = 2);
 char info[];
+
+// 추가한 것
+extern int enemyLog[2][2];
+extern int myLog[2][2];
+
+void setMyWeight(int cnt);
+void searchMyTree(int bx, int by, int x, int y, int level);
+void setEnemyWeight(int cnt);
+void searchEnemyTree(int bx, int by, int x, int y, int level);
+
+bool empty();
+bool line_check(int bx, int by, int cx, int cy, int level);
+void set_opposition(int x, int y);
