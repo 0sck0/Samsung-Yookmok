@@ -157,36 +157,40 @@ int searchMyTree(int x, int y, int incX, int incY, int level) {
 			int mipos = showBoard(x - i, y - j);
 			if ((i == 0 && j == 0) || (i == incX * -1 && j == incY * -1)) continue;
 
+
 			if (pos == 0) {
 				val[y + j][x + i] += 10;
 				if (incX == i && incY == j)
 				{
-					val[y + j][x + i] = 200 * level;
+					val[y + j][x + i] += 300 * level;
 					if (level >= 2 && showBoard(x + (-i * (level)), y + (-j * (level ))) == 0)
-						val[y + (-j * level)][x + (-i * level)] = 200 * level;
+						val[y + (-j * level)][x + (-i * level)] += 250 * level;
 				}
 
 			}
 			else if (pos == 1 || pos == 3) {
+
 				val[y + j][x + i] = -1;
 				if (level == 1)
-					return searchEnemyTree(x + i, y + j, i, j, level + 1);
-				else if (incX == i && incY == j) return searchMyTree(x + i, y + j, i, j, level + 1);
-				else if (mipos == 1 || mipos == 3)
+					searchMyTree(x + i, y + j, i, j, level + 1);
+				if (incX == i && incY == j) searchMyTree(x + i, y + j, i, j, level + 1);
+				else if ((mipos == 1 || mipos == 3))
 				{
 					int end = searchMyTree(x + i, y + j, i, j, 2);
 					int end1 = searchMyTree(x - i, y - j, -i, -j, 2);
 					if (showBoard(x + (i * end), y + (j * end)) == 0)
-						val[y + (j * end)][x + (i * end)] = (end + end1 - 1) * 200;
-					if (showBoard(x + (-i * end), y + (-j * end)) == 0)
-						val[y + (-j * end1)][x + (-i * end1)] = (end + end1 - 1) * 200;
+						val[y + (j * end)][x + (i * end)] += (end + end1 - 1) * 250;
+					if (showBoard(x + (-i * end1), y + (-j * end1)) == 0)
+						val[y + (-j * end1)][x + (-i * end1)] += (end + end1 - 1) * 250;
 				}
+				else if (val[y + j][x + i] != -1)
+					searchMyTree(x + i, y + j, i, j, 2);
 			}
 			else {
 				if (incX == i && incY == j) {
 					val[y + j][x + i] = -2;
 					if (level >= 2 && showBoard(x + (-i * (level)), y + (-j * (level))) == 0)
-						val[y + (-j * level)][x + (-i * level)] = 200 * level;
+						val[y + (-j * level)][x + (-i * level)] += 250 * level;
 				}
 				else val[y + j][x + i] = -2;
 			}
@@ -204,7 +208,7 @@ void setEnemyWeight(int cnt) {
 		int x = enemyLog[i][0];
 		int y = enemyLog[i][1];
 
-		val[y][x] = -1;
+		val[y][x] = -2;
 
 		searchEnemyTree(x, y, 0, 0, 1);	// level 1부터 시작
 	}
@@ -226,21 +230,24 @@ int searchEnemyTree(int x, int y, int incX, int incY, int level) {
 					if (level >= 2 && showBoard(x + (-i * (level)), y + (-j * (level))) == 0)
 						val[y + (-j * level)][x + (-i * level)] = 200 * level;
 				}
+				
 			}
 			else if (pos == 2 || pos == 3) {
 				val[y + j][x + i] = -2;
 				if (level == 1)
-					return searchEnemyTree(x + i, y + j, i, j, level + 1);
-				else if (incX == i && incY == j) return searchEnemyTree(x + i, y + j, i, j, level + 1);
+					searchEnemyTree(x + i, y + j, i, j, level + 1);
+				if (incX == i && incY == j) searchEnemyTree(x + i, y + j, i, j, level + 1);
 				else if (mipos == 2 || mipos == 3)
 				{
 					int end = searchEnemyTree(x + i, y + j, i, j, 2);
 					int end1 = searchEnemyTree(x - i, y - j, -i, -j, 2);
 					if (showBoard(x + (i * end), y + (j * end)) == 0)
-						val[y + (j * end)][x + (i * end)] = (end + end1-1) * 200;
-					if (showBoard(x + (-i * end), y + (-j * end)) == 0)
+					 	val[y + (j * end)][x + (i * end)] = (end + end1-1) * 200;
+					if (showBoard(x + (-i * end1), y + (-j * end1)) == 0)
 						val[y + (-j * end1)][x + (-i * end1)] = (end + end1-1) * 200;
 				}
+				else if (val[y + j][x + i] != -2)
+					searchEnemyTree(x + i, y + j, i, j, 2);
 			}
 			else {
 				if (incX == i && incY == j) {
