@@ -29,7 +29,7 @@ int showBoard(int x, int y) : [x, y] 좌표에 무슨 돌이 존재하는지 보여주는 함수 (
 #include <cmath>
 #include <algorithm>
 #include <iostream>
-#include <limits>
+#include <vector>
 
 using namespace std;
 
@@ -39,19 +39,20 @@ using namespace std;
 char info[] = { "TeamName:1234567890,Department:AI부서[C]" };
 
 float inclination;			// 바둑돌 선형성 검사 변수
-int val[19][19] = { 0, };			// 전체 가중치를 나타내는 배열
+int val[19][19];			// 전체 가중치를 나타내는 배열
 int center_x, center_y;		// 중심이 되는 x, y 좌표 값
+int tracker[19][19];
+std::vector<int> mustDo;
+std::vector<Position> promPos;
 
 void myturn(int cnt) {
 
 	int x[2], y[2];
 	int maxVal = 1;			// 가중치 중 가장 큰 값
 
+							// 입출력으로 log 확인
 	FILE *file_pointer;
-	file_pointer = fopen("C:\\Users\\최대준\\Desktop\\R\\log.txt", "a");
-
-	// 입출력으로 log 확인
-
+	file_pointer = fopen("C:\\Users\\노유찬\\Desktop\\육목\\삼성전자DS부문육목SW알고리즘대회\\Log\\log.txt", "a");
 
 	// 이 부분에서 알고리즘 프로그램(AI)을 작성하십시오. 기본 제공된 코드를 수정 또는 삭제하고 본인이 코드를 사용하시면 됩니다.
 	// 현재 Sample code의 AI는 Random으로 돌을 놓는 Algorithm이 작성되어 있습니다.
@@ -59,14 +60,13 @@ void myturn(int cnt) {
 	srand((unsigned)time(NULL));
 
 	// 가중치 0으로 초기화
-	/*
 	for (int i = 0; i < width; i++) {
-		for (int j = 0; j < height; j++){
+		for (int j = 0; j < height; j++) {
 			val[i][j] = 0;
 		}
 	}
-	*/
-	if (cnt == 1) {			// 첫 수 둘 경우
+
+	if (empty()) {			// 첫 수 둘 경우
 		x[0] = 9;			// 9, 9 를 기본
 		y[0] = 9;
 
@@ -84,37 +84,35 @@ void myturn(int cnt) {
 		}
 	}
 	else {
-		if (enemyLog[1][0] == -1 && myLog[1][0] == -1) {
-			setEnemyWeight(1);
-		}
-		else if (myLog[1][0] == -1) {
-			setMyWeight(1);
-			setEnemyWeight(cnt);
-		}
-		else {
-			setEnemyWeight(cnt);
-			setMyWeight(cnt);
-		}
+		check();
 	}
 
 	// 로그 출력
-	fprintf(file_pointer, "\n");
 	for (int i = 0; i < width; i++) {
 		for (int j = 0; j < height; j++) {
-			fprintf(file_pointer, "%.4d ", val[i][j]);
+			fprintf(file_pointer, "%d ", val[i][j]);
 		}
 		fprintf(file_pointer, "\n");
 	}
-
+	fprintf(file_pointer, "\n\n");
+	
 	for (int k = 0; k < cnt; k++) {
-		maxVal = 1;
-		for (int j = 0; j < height; j++) {
-			for (int i = 0; i < width; i++) {
-				if (maxVal < val[j][i]) {
-					maxVal = val[j][i];
+		if (mustDo.size() > 0) {
+			x[k] = mustDo.back();
+			mustDo.pop_back();
+			y[k] = mustDo.back();
+			mustDo.pop_back();
+		}
+		else {
+			maxVal = 1;
+			for (int j = 0; j < height; j++) {
+				for (int i = 0; i < width; i++) {
+					if (maxVal < val[j][i]) {
+						maxVal = val[j][i];
 
-					x[k] = i;
-					y[k] = j;
+						x[k] = i;
+						y[k] = j;
+					}
 				}
 			}
 		}
@@ -124,7 +122,6 @@ void myturn(int cnt) {
 		if (terminateAI) return;
 
 	}
-	fclose(file_pointer);
 
 	// 이 부분에서 자신이 놓을 돌을 출력하십시오.
 	// 필수 함수 : domymove(x배열,y배열,배열크기)
@@ -133,137 +130,245 @@ void myturn(int cnt) {
 
 }
 
-// 내 돌 검사
-void setMyWeight(int cnt) {
-	int weight = 0;
+void check() {
+	// 우선순위 1 : 내 돌 중 6개를 만들 수 있는 곳이 있는지 확인
+	checkMyWin();
+	// 우선순위 2 : 적 돌 중 6개를 만들 수 있는 곳이 있는지 확인
+	checkEnemyWin();
+	// 우선순위 3 : 내돌과 적돌을 봐가면서 가중치에 따른 내 돌 놓기
+	setMyWeight();
+	setEnemyWeight();
+}
 
-	for (int i = 0; i < cnt; i++) {
-		int x = myLog[i][0];
-		int y = myLog[i][1];
-		center_x = x;
-		center_y = y;
+void checkMyWin() {
+	if(myLog.size() > 0) {
+		for (Position &p : myLog) {
+			int curX = p.getX();
+			int curY = p.getY();
+		
+			val[curY][curX] = -1;
 
-		val[y][x] = -1;
+			for (int i = 0; i < width; i++) {
+				for (int j = 0; j < height; j++) {
+					tracker[i][j] = 0;				// 초기화
+				}
+			}
 
-		searchMyTree(x, y, 0, 0, 1);	// level 1부터 시작
+			checkMyPromising(curX, curY, 1);
+		}
 	}
 }
 
-int searchMyTree(int x, int y, int incX, int incY, int level) {
+void checkMyPromising(int curX, int curY, int level) {
+	if (curX - 1 >= 0 && curX + 1 <= 19 && curY - 1 >= 0 && curY + 1 <= 19) {
+		for (int x = curX - 1; x <= curX + 1; x++) {
+			for (int y = curY - 1; y <= curY + 1; y++) {
+				int pos = showBoard(x, y);
+				bool line = lineCheck(curX, curY, x, y, level);
 
-	for (int j = -1; j <=  1; j++) {
-		for (int i = -1; i <= 1; i++) {
-			int pos = showBoard(x + i, y + j);
-			int mipos = showBoard(x - i, y - j);
-			if ((i == 0 && j == 0) || (i == incX * -1 && j == incY * -1)) continue;
+				if ((x == curX && y == curY) || tracker[x][y] == 1) continue;
 
-			if (pos == 0) {
-				val[y + j][x + i] += 10;
-				if (incX == i && incY == j)
-				{
-					val[y + j][x + i] = 200 * level;
-					if (level >= 2 && showBoard(x + (-i * (level)), y + (-j * (level ))) == 0)
-						val[y + (-j * level)][x + (-i * level)] = 200 * level;
+				// 본격적인 검사
+				if (line) { 
+					if (level == 6) {
+						for (Position &p : promPos) {
+							mustDo.push_back(p.getX());
+							mustDo.push_back(p.getY());
+						}
+					}
+					else {
+						if (pos == 0 && promPos.size() < 2) {
+							promPos.push_back(Position(x, y));
+							checkMyPromising(x, y, level + 1);
+						}
+						else if (pos == 1 || pos == 3) {
+							checkMyPromising(x, y, level + 1);
+						}
+						else {
+							promPos.clear();
+						}
+					}
 				}
-
-			}
-			else if (pos == 1 || pos == 3) {
-				val[y + j][x + i] = -1;
-				if (level == 1)
-					return searchEnemyTree(x + i, y + j, i, j, level + 1);
-				else if (incX == i && incY == j) return searchMyTree(x + i, y + j, i, j, level + 1);
-				else if (mipos == 1 || mipos == 3)
-				{
-					int end = searchMyTree(x + i, y + j, i, j, 2);
-					int end1 = searchMyTree(x - i, y - j, -i, -j, 2);
-					if (showBoard(x + (i * end), y + (j * end)) == 0)
-						val[y + (j * end)][x + (i * end)] = (end + end1 - 1) * 200;
-					if (showBoard(x + (-i * end), y + (-j * end)) == 0)
-						val[y + (-j * end1)][x + (-i * end1)] = (end + end1 - 1) * 200;
-				}
-			}
-			else {
-				if (incX == i && incY == j) {
-					val[y + j][x + i] = -2;
-					if (level >= 2 && showBoard(x + (-i * (level)), y + (-j * (level))) == 0)
-						val[y + (-j * level)][x + (-i * level)] = 200 * level;
-				}
-				else val[y + j][x + i] = -2;
 			}
 		}
 	}
-	return level;
+	else {
+		return;
+	}
+}
+
+void checkEnemyWin() {
+	if (enemyLog.size() > 0) {
+		for (Position &p : enemyLog) {
+			int curX = p.getX();
+			int curY = p.getY();
+
+			val[curY][curX] = -1;
+
+			for (int i = 0; i < width; i++) {
+				for (int j = 0; j < height; j++) {
+					tracker[i][j] = 0;				// 초기화
+				}
+			}
+
+			checkEnemyPromising(curX, curY, 1);
+		}
+	}
+}
+
+void checkEnemyPromising(int curX, int curY, int level) {
+	if (curX - 1 >= 0 && curX + 1 <= 19 && curY - 1 >= 0 && curY + 1 <= 19) {
+		for (int x = curX - 1; x <= curX + 1; x++) {
+			for (int y = curY - 1; y <= curY + 1; y++) {
+				int pos = showBoard(x, y);
+				bool line = lineCheck(curX, curY, x, y, level);
+
+				if ((x == curX && y == curY) || tracker[x][y] == 1) continue;
+
+				// 본격적인 검사
+				if (line) {
+					if (level == 6) {
+						for (Position &p : promPos) {
+							mustDo.push_back(p.getX());
+							mustDo.push_back(p.getY());
+						}
+					}
+					else {
+						if (pos == 0 && promPos.size() < 2) {
+							promPos.push_back(Position(x, y));
+							checkEnemyPromising(x, y, level + 1);
+						}
+						else if (pos == 2 || pos == 3) {
+							checkEnemyPromising(x, y, level + 1);
+						}
+						else {
+							promPos.clear();
+						}
+					}
+				}
+			}
+		}
+	}
+	else {
+		return;
+	}
+}
+
+// 내 돌 검사
+void setMyWeight() {
+	if (myLog.size() > 0) {
+		for (Position &p : myLog) {
+			int x = p.getX();
+			int y = p.getY();
+			center_x = x;
+			center_y = y;
+
+			val[y][x] = -1;
+
+			// 검사했던 곳을 다시 검사하지 않도록 myTracker 사용
+			for (int i = 0; i < width; i++) {
+				for (int j = 0; j < height; j++) {
+					tracker[i][j] = 0;				// 초기화
+				}
+			}
+
+			searchMyTree(x, y, 1);						// level 1부터 시작
+		}
+	}
+}
+
+void searchMyTree(int x, int y, int level) {
+	// 3x3 검사
+	for (int j = y - 1; j <= y + 1; j++) {
+		for (int i = x - 1; i <= x + 1; i++) {
+
+			int pos = showBoard(i, j);
+			bool line = lineCheck(x, y, i, j, level + 1);
+
+			if (i == x && j == y) continue;				// 전에 뒀던 x, y 좌표 pass
+			else if (tracker[i][j] == 1) continue;	// tracker를 이용해서 전에 검사했던 부분을 pass
+
+			if (pos == 0) {
+				val[j][i] += 50;
+				if (line == true) val[j][i] += 200 * level;
+			}
+			else if (pos == 1 || pos == 3) {
+				val[j][i] = -1;
+				tracker[i][j] = 1;
+				if (line == true) searchMyTree(i, j, level + 1);
+				else searchMyTree(i, j, 1);
+			}
+			else {
+				if (line == true) {
+					val[j][i] -= 20;
+					set_opposition(i, j);
+				}
+				else val[j][i] -= 10;
+			}
+		}
+	}
 }
 
 
 // 적 돌 검사
-void setEnemyWeight(int cnt) {
-	int weight = 0;
+void setEnemyWeight() {
+	if (enemyLog.size() > 0) {
+		for (Position &p : enemyLog) {
+			int x = p.getX();
+			int y = p.getY();
 
-	for (int i = 0; i < cnt; i++) {
-		int x = enemyLog[i][0];
-		int y = enemyLog[i][1];
+			val[y][x] = -1;
 
-		val[y][x] = -1;
+			for (int i = 0; i < width; i++) {
+				for (int j = 0; j < height; j++) {
+					tracker[i][j] = 0;
+				}
+			}
 
-		searchEnemyTree(x, y, 0, 0, 1);	// level 1부터 시작
+			searchEnemyTree(x, y, 1);	// level 1부터 시작
+		}
 	}
 }
 
-int searchEnemyTree(int x, int y, int incX, int incY, int level) {
+void searchEnemyTree(int x, int y, int level) {
 
-	for (int j = -1; j <= 1; j++) {
-		for (int i = -1; i <= 1; i++) {
-			int pos = showBoard(x + i, y + j);
-			int mipos = showBoard(x - i, y - j);
-			if ((i == 0 && j == 0) || (i == incX * -1 && j == incY * -1)) continue;
+	for (int j = y - 1; j <= y + 1; j++) {
+		for (int i = x - 1; i <= x + 1; i++) {
+			int pos = showBoard(i, j);
+			bool line = lineCheck(x, y, i, j, level + 1);
+
+			if (i == x && j == y) continue;
+			else if (tracker[i][j] == 1) continue;
+			else tracker[i][j] = 1;
 
 			if (pos == 0) {
-				val[y + j][x + i] += 10;
-				if (incX == i && incY == j)
-				{
-					val[y + j][x + i] = 200 * level;
-					if (level >= 2 && showBoard(x + (-i * (level)), y + (-j * (level))) == 0)
-						val[y + (-j * level)][x + (-i * level)] = 200 * level;
-				}
+				val[j][i] += 50;
+				if (line == true) val[j][i] += 200 * level;
 			}
 			else if (pos == 2 || pos == 3) {
-				val[y + j][x + i] = -2;
-				if (level == 1)
-					return searchEnemyTree(x + i, y + j, i, j, level + 1);
-				else if (incX == i && incY == j) return searchEnemyTree(x + i, y + j, i, j, level + 1);
-				else if (mipos == 2 || mipos == 3)
-				{
-					int end = searchEnemyTree(x + i, y + j, i, j, 2);
-					int end1 = searchEnemyTree(x - i, y - j, -i, -j, 2);
-					if (showBoard(x + (i * end), y + (j * end)) == 0)
-						val[y + (j * end)][x + (i * end)] = (end + end1-1) * 200;
-					if (showBoard(x + (-i * end), y + (-j * end)) == 0)
-						val[y + (-j * end1)][x + (-i * end1)] = (end + end1-1) * 200;
-				}
+				val[j][i] = -1;
+				tracker[i][j] = 1;
+				if (line == true) searchEnemyTree(i, j, level + 1);
+				else searchEnemyTree(i, j, 1);
 			}
 			else {
-				if (incX == i && incY == j) {
-					val[y + j][x + i] = -1;
-					if (level >= 2 && showBoard(x + (-i * (level)), y + (-j * (level))) == 0)
-						val[y + (-j * level)][x + (-i * level)] = 200 * level;
+				if (line == true) {
+					val[j][i] -= 20;
+					set_opposition(i, j);
 				}
-				else val[y + j][x + i] = -1;
+				else val[j][i] -= 10;
 			}
 		}
 	}
-	return level;
 }
 
 // 부가적인 함수들
 
 // 보드가 빈 상태인지 확인
 bool empty() {
-	int count = 0;
-
 	for (int i = 0; i < width; i++) {
 		for (int j = 0; j < height; j++) {
-			if (showBoard(i, j) != 0) return false;
+			if (showBoard(i, j) == 1 || showBoard(i, j) == 2) return false;
 		}
 	}
 
@@ -271,38 +376,36 @@ bool empty() {
 }
 
 // 선형성 검사 함수
-bool line_check(int bx, int by, int cx, int cy, int level) {
+bool lineCheck(int bx, int by, int cx, int cy, int level) {
+	bool check = false;
 
 	// level이 2 이하면 돌을 2개째 검사하는 것을 의미
 	if (level <= 2) {
-		if ((cy - by) == 0)
+		if ((cx - bx) == 0)
 			inclination = 10000.0;	// 분모가 0 인 경우
 		else
-			inclination = (cx - bx) / (cy - by);
+			inclination = (cy - by) / (cx - bx);
 
-		if (inclination == 0.0 || inclination == 1.0 || inclination == -1.0 || inclination == 10000.0) return true;
-		else false;
+		if (inclination == 0.0 || inclination == 1.0 || inclination == -1.0 || inclination == 10000.0) check = true;
 	}
 	else if (level > 2) {
 		double temp;
-		if ((cy - by) == 0) {
-			temp == 10000.0;
-		}
-		else {
-			temp = (cx - bx) / (cy - by);
-		}
+		if ((cx - bx) == 0)
+			temp = 10000.0;
+		else
+			temp = (cy - by) / (cx - bx);
 
-		if (inclination == temp) return true;
-		else return false;
+		if (inclination == temp) check = true;
 	}
-	return false;
+
+	return check;
 }
 
 // 적돌의 반대편 위치 가중치 설정
 void set_opposition(int x, int y) {
 	for (int j = center_y - 1; j <= center_y + 1; j++) {
 		for (int i = center_x - 1; i <= center_x + 1; i++) {
-			if (line_check(center_x, center_y, i, j, 3) && showBoard(i, j) == 0) {
+			if (lineCheck(center_x, center_y, i, j, 3) && showBoard(i, j) == 0) {
 				val[j][i] -= 50;
 			}
 		}

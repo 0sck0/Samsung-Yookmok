@@ -3,6 +3,7 @@
 // <--------------- 이 Code를 수정하면  작동하지 않을 수 있습니다 ------------------>
 
 #pragma once
+
 extern int width, height;
 extern int terminateAI;
 extern unsigned s_time;
@@ -25,14 +26,43 @@ void myturn(int cnt = 2);
 char info[];
 
 // 추가한 것
-extern int enemyLog[2][2];
-extern int myLog[2][2];
+#include <vector>
 
-void setMyWeight(int cnt);
-int searchMyTree(int x, int y, int incX, int incY, int level);
-void setEnemyWeight(int cnt);
-int searchEnemyTree(int x, int y, int incX, int incY, int level);
+class Position {
+private:
+	int x;
+	int y;
+public:
+	Position() {}
+	Position(int x, int y) {
+		this->x = x;
+		this->y = y;
+	}
+	int getX() { return this->x; }
+	int getY() { return this->y; }
+
+	Position &operator =(const Position &Other) {
+		this->x = Other.x;
+		this->y = Other.y;
+	}
+};
+
+extern std::vector<Position> myLog;
+extern std::vector<Position> enemyLog;
+
+
+void setMyWeight();
+void searchMyTree(int x, int y, int level);
+void setEnemyWeight();
+void searchEnemyTree(int x, int y, int level);
 
 bool empty();
-bool line_check(int bx, int by, int cx, int cy, int level);
+bool lineCheck(int bx, int by, int cx, int cy, int level);
 void set_opposition(int x, int y);
+
+// ver0809
+void check();
+void checkMyWin();
+void checkEnemyWin();
+void checkMyPromising(int curX, int curY, int level);
+void checkEnemyPromising(int curX, int curY, int level);
