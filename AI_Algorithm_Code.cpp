@@ -33,84 +33,111 @@ int showBoard(int x, int y) : [x, y] 좌표에 무슨 돌이 존재하는지 보여주는 함수 (
 <-------AI를 작성하실 때, 같은 이름의 함수 및 변수 사용을 권장하지 않습니다----->
 */
 
-#include <stdio.h>
+#include <iostream>
 #include <Windows.h>
 #include <time.h>
 #include "Connect6Algo.h"
+#include <string>
+#include <vector>
+#include <queue>
+#include <unordered_map>
+
+using namespace std;
 
 // "샘플코드[C]"  -> 자신의 팀명 (수정)
 // "AI부서[C]"  -> 자신의 소속 (수정)
 // 제출시 실행파일은 반드시 팀명으로 제출!
 char info[] = { "TeamName:모자란 녀석들,Department:KOREATECH" };
 
-int lastBoard[20][20];
+// 내가 마지막으로 착수한 돌의 위치 (-1로 초기화)
+int myx[2] = { -1, -1 }, myy[2] = { -1, -1 };
+
+// 상대방이 마지막으로 착수한 돌의 위치 (-1로 초기화)
+int opx[2] = { -1, -1 }, opy[2] = { -1, -1 };
+
+// (가중치, (x좌표, y좌표))를 나타내는 자료형 valued_point 정의
+// first: 가중치, second.first: x 좌표, second.second: y 좌표
+typedef pair<int, pair<int, int>> valued_point;
+
+// 최적의 수의 가중치와 좌표(순서쌍)를 저장하는 우선순위 큐
+priority_queue<valued_point> myQueue;
+
+void checkAround(int px, int py);
+int setPriority(string s);
+void debugPrint();		// 우선순위 큐 디버그용
 
 void myturn(int cnt) {
 
 	int x[2], y[2];
 
-	// 이 부분에서 알고리즘 프로그램(AI)을 작성하십시오. 기본 제공된 코드를 수정 또는 삭제하고 본인이 코드를 사용하시면 됩니다.
-	// 현재 Sample code의 AI는 Random으로 돌을 놓는 Algorithm이 작성되어 있습니다.
-
 	srand((unsigned)time(NULL));
 
-	int opx[2], opy[2];
-	getLastOpMove(opx, opy);
-
-	/*
-	for (int i = 0; i < cnt; i++) {
-		do {
-			x[i] = rand() % width;
-			y[i] = rand() % height;
-			if (terminateAI) return;
-		} while (!isFree(x[i], y[i]));
-
-		if (x[1] == x[0] && y[1] == y[0]) i--;
-	}
-	*/
-	if (cnt == 1) {
+	if (cnt == 1) {		// 첫 수일 경우 정가운데에 착수
 		x[0] = width / 2;
 		y[0] = height / 2;
 	}
-	else {
-		/*
-		if (opx[0] == 0)
-			x[0] = opx[0] + 1;
-		else if (opx[0] == width - 1)
-			x[0] = opx[0] - 1;
-		else {
-			if (opx[0] < width - opx[0])
-				x[0] = opx[0] + 1;
-			else if (opx[0] > width - opx[0])
-				x[0] = opx[0] - 1;
-			else
-				x[0] = opx[0] + (-1) * (rand() % 2);
-		}
-
-		if (opy[0] == 0)
-			y[0] = opy[0] + 1;
-		else if (opy[0] == height - 1)
-			y[0] = opy[0] - 1;
-		else {
-			y[0] = opy[0] - 1 + (rand() % 3);
-		}
-		*/
-		if (check5x5(opx[0], opy[0])) {
+	else {				// 첫 수를 제외한 모든 경우
+		if (opx[1] == -1 && opy[1] == -1) {		// 다음 착수자의 첫 수일 경우
 			while (true) {
 				x[0] = opx[0] - 1 + (rand() % 3);
 				y[0] = opy[0] - 1 + (rand() % 3);
 				if (isFree(x[0], y[0])) break;
 			}
 			while (true) {
-				x[1] = x[0] + (-1) * (rand() % 2);
-				y[1] = y[0] + (-1) * (rand() % 2);
+				switch (rand() % 4) {
+				case 0:
+					x[1] = x[0] - 1;
+					y[1] = y[0];
+					break;
+				case 1:
+					x[1] = x[0];
+					y[1] = y[0] - 1;
+					break;
+				case 2:
+					x[1] = x[0] + 1;
+					y[1] = y[0];
+					break;
+				case 3:
+					x[1] = x[0];
+					y[1] = y[0] + 1;
+					break;
+				}
+
+				if (((opx[0] == x[0]) && (x[0] == x[1])) || ((opy[0] == y[0]) && (y[0] == y[1]))) continue;
 				if (isFree(x[1], y[1])) break;
 			}
 		}
+		else {		// 그 외의 모든 경우
+			checkAround(myx[0], myy[0]);
+			checkAround(myx[1], myy[1]);
+			checkAround(opx[0], opy[0]);
+			checkAround(opx[1], opy[1]);
 
+			debugPrint();		// 우선순위 큐 디버그용
+
+			valued_point candidate;
+			for (int i = 0; i < cnt; i++) {
+				candidate = myQueue.top();
+				myQueue.pop();
+				x[i] = candidate.second.first;
+				y[i] = candidate.second.second;
+
+				if (!isFree(x[i], y[i]) || ((x[0] == x[1]) && (y[0] == y[1]))) i--;
+				if (terminateAI) return;
+			}
+
+			valued_point vp;
+
+		}
 	}
 
-	setLastOpMove();
+	// 디버그용
+	char dd[200] = { " " };
+	sprintf_s(dd, "--- opx[0]: %d, opy[0]: %d, opx[1]: %d, opy[1]: %d ---\n", opx[0], opy[0], opx[1], opy[1]);
+	writeLog(dd);
+
+	//	while (!myQueue.empty())
+	//		myQueue.pop();
 
 	// 이 부분에서 자신이 놓을 돌을 출력하십시오.
 	// 필수 함수 : domymove(x배열,y배열,배열크기)
@@ -118,31 +145,205 @@ void myturn(int cnt) {
 	domymove(x, y, cnt);
 }
 
-// 현재 바둑판 상태 저장
-void setLastOpMove() {
-	for (int i = 0; i < width; i++)
-		for (int j = 0; j < height; j++)
-			lastBoard[i][j] = showBoard(i, j);
-}
+// 특정 돌의 8 방향을 문자열화하여 각 라인을 검사, 돌을 놓을 좌표의 우선순위를 선정하는 함수
+void checkAround(int px, int py) {
+	string str = "";
+	valued_point pos;		// 검사할 돌의 가중치(value)와 좌표 순서쌍 (x, y)
+	unordered_map<string, int> tokens;
+	vector<valued_point> tempQueue;		// 각 좌표와 가중치를 임시 저장하는 큐
 
-// 마지막 바둑판 상태 불러오기
-void getLastOpMove(int* x, int* y) {
-	for (int n = 0; n < 2; n++) {
-		for (int i = 0; i < width; i++) {
-			for (int j = 0; j < height; j++) {
-				if (lastBoard[i][j] != showBoard(i, j)) {
-					*(x+n) = i;
-					*(y+n) = j;
+	int firstIndex = 0, lastIndex = 0;
+	int x_begin = -1, y_begin = -1;
+
+	if (px == -1 && py == -1) return;
+
+	// 상/하(0) -> 좌상/우하(1) -> 좌/우(2) -> 좌하/우상(3) 순으로 검사
+	for (int incl = 0; incl < 4; incl++) {
+		switch (incl) {
+		case 0:		// 상 -> 하
+			x_begin = px;
+			y_begin = 0;
+
+			for (int i = 0; i < height; i++)
+				str.append(to_string(showBoard(px, i)));
+			break;
+		case 1:		// 좌상 -> 우하
+			if (px > py) {
+				x_begin = px - py;
+				y_begin = 0;
+			}
+			else {
+				x_begin = 0;
+				y_begin = py - px;
+			}
+
+			for (int i = 0; i < height - abs(px - py) + 1; i++)
+				if (px > py)	// 대각선 위
+					str.append(to_string(showBoard((px - py) + i, i)));
+				else			// 대각선 아래
+					str.append(to_string(showBoard(i, (py - px) + i)));
+			break;
+		case 2:		// 좌 -> 우
+			x_begin = 0;
+			y_begin = py;
+
+			for (int i = 0; i < width; i++)
+				str.append(to_string(showBoard(i, py)));
+			break;
+		case 3:		// 좌하 -> 우상
+			if (px + py < height) {		// 대각선 위
+				x_begin = 0;
+				y_begin = px + py;
+
+				for (int i = 0; i < (px + py + 1); i++)
+					str.append(to_string(showBoard(i, (px + py) - i)));
+			}
+			else {						// 대각선 아래
+				x_begin = (px + py) - height;
+				y_begin = height - 1;
+				for (int i = 0; i < (height * 2 - (px + py)) + 1; i++)
+					str.append(to_string(showBoard((px + py) - height + i, height - i)));
+			}
+			break;
+		}
+
+		// 디버그용
+		fp = fopen("myLog.txt", "a");
+		if (fp != NULL) {
+			string tmp = to_string(incl) + string(" : ") + str;
+			fprintf(fp, tmp.c_str());
+			fprintf(fp, "\n");
+		}
+		fclose(fp);
+
+		// 문자열 토큰화
+		while (true) {
+			firstIndex = str.find("0", lastIndex);
+			lastIndex = str.find("0", firstIndex + 1);
+
+			if (lastIndex == -1) lastIndex = str.size() - 1;
+			if (lastIndex - firstIndex > 1) {
+				string temp = str.substr(firstIndex, lastIndex - firstIndex + 1);
+				//tokens.push_back(temp);
+				tokens.emplace(make_pair(temp, firstIndex));
+			}
+
+			if (lastIndex == str.size() - 1) break;
+		}
+
+		for (auto s : tokens) {
+			int value = setPriority(s.first);
+			int qx[2] = { -1, -1 }, qy[2] = { -1, -1 };
+
+			for (int i = 0; i < 2; i++) {
+				switch (incl) {
+				case 0:		// 상 -> 하
+					qx[i] = x_begin;
+					if (i == 0) qy[i] = s.second;
+					else qy[i] = s.second + s.first.size() - 1;
+					break;
+				case 1:		// 좌상 -> 우하
+					if (i == 0) {
+						qx[i] = x_begin + s.second;
+						qy[i] = y_begin + s.second;
+					}
+					else {
+						qx[i] = x_begin + s.second + s.first.size() - 1;
+						qy[i] = y_begin + s.second + s.first.size() - 1;
+					}
+					break;
+				case 2:		// 좌 -> 우
+					if (i == 0) qx[i] = s.second;
+					else qx[i] = s.second + s.first.size() - 1;
+					qy[i] = y_begin;
+					break;
+				case 3:		// 좌하 -> 우상
+					if (i == 0) {
+						qx[i] = x_begin + s.second;
+						qy[i] = y_begin - s.second;
+					}
+					else {
+						qx[i] = x_begin + s.second + s.first.size() - 1;
+						qy[i] = y_begin - (s.second + s.first.size() - 1);
+					}
+					break;
 				}
+
+				pos = make_pair(value, make_pair(qx[i], qy[i]));
+				tempQueue.push_back(pos);
+				writeLog("0 ");
 			}
 		}
+
+		str.clear();			// 문자열 초기화
+	}
+	writeLog("\n");
+
+	while (!myQueue.empty()) {
+		tempQueue.push_back(myQueue.top());
+		myQueue.pop();
+	}
+
+	// 가중치 가산이 끝난 임시 저장 큐의 모든 원소를 정리(압축) 후 우선순위 큐로 이동
+	for (auto a = tempQueue.begin(); a != tempQueue.end(); a++) {
+		auto tmp = *a;
+		writeLog("1 ");
+		if (tempQueue.empty()) break;
+		else tempQueue.erase(a);
+		writeLog("2 ");
+		for (auto b = a; b != tempQueue.end(); b++) {
+			writeLog("3 ");
+			if ((*b).second.first == tmp.second.first && (*b).second.second == tmp.second.second) {
+				writeLog("4 ");
+				tmp.first += (*b).first;
+				tempQueue.erase(b);
+				writeLog("5 ");
+			}
+		}
+		myQueue.push(tmp);
+		writeLog("\n");
 	}
 }
 
-// 주변 5x5 체크
-bool check5x5(int x, int y) {
-	for (int i = x - 2; i <= x + 2; i++)
-		for (int j = y - 2; j <= y + 2; j++)
-			if (!isFree(i, j)) return false;
-	return true;
+// 문자열 토큰의 검사하여 가중치를 부여하는 함수
+int setPriority(string s) {
+	int value;
+
+	// 가중치 부여
+	if (s == "010")				value = 20;
+	else if (s == "0110")		value = 100;
+	else if (s == "01110")		value = 500;
+	else if (s == "011110")		value = 2000;
+	else if (s == "0111110")	value = 10000;
+	else if (s == "020")		value = 10;
+	else if (s == "0220")		value = 50;
+	else if (s == "02220")		value = 200;
+	else if (s == "022220")		value = 1000;
+	else if (s == "0222220")	value = 5000;
+	else						value = 0;
+
+	return value;
+}
+
+// 우선순위 큐 디버그용
+void debugPrint() {
+	vector<valued_point> vp;
+	string tmp;
+
+	while (!myQueue.empty()) {
+		vp.push_back(myQueue.top());
+		myQueue.pop();
+	}
+
+	fp = fopen("myLog.txt", "a");
+	for (auto a : vp) {
+		if (fp != NULL) {
+			tmp = to_string(a.first) + string("_(") + to_string(a.second.first) + string(", ") + to_string(a.second.second) + string(")   ");
+			fprintf(fp, tmp.c_str());
+		}
+		myQueue.push(a);
+	}
+	if (fp != NULL)
+		fprintf(fp, "\n");
+	fclose(fp);
 }

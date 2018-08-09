@@ -8,7 +8,7 @@ extern int terminateAI;
 extern unsigned s_time;
 
 extern FILE *fp;
-
+extern void writeLog(char *myLog);
 
 extern int isFree(int x, int y);
 extern int showBoard(int x, int y);
@@ -24,10 +24,8 @@ extern void writeLog(char *log);
 void myturn(int cnt = 2);
 char info[];
 
-// 추가 전역 변수
-// 상대방이 마지막으로 착수한 돌을 파악하기 위한 이전 바둑판 상태 저장 배열
-extern int lastBoard[20][20];
+// 내가 마지막으로 착수한 돌의 위치
+extern int myx[2], myy[2];
 
-void setLastOpMove();
-void getLastOpMove(int* x, int* y);
-bool check5x5(int x, int y);
+// 상대방이 마지막으로 착수한 돌의 위치
+extern int opx[2], opy[2];
