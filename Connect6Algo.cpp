@@ -22,18 +22,6 @@ static HANDLE event1, event2;
 int board[BOARD_SIZE][BOARD_SIZE];
 int limitTime = 0;
 
-// int myLog[2][2] = { { -1,-1 },{ -1,-1 } };
-// int enemyLog[2][2] = { { -1,-1 },{ -1,-1 } };
-
-using namespace std;
-
-vector<Position> myLog;
-vector<Position> enemyLog;
-
-void setPos(int x, int y) {
-
-}
-
 static void getLine() {
 	int c, bytes;
 
@@ -246,7 +234,9 @@ void mymove(int x[], int y[], int cnt) {
 		if (isFree(x[i], y[i])) {
 			board[x[i]][y[i]] = 1;
 
-			myLog.push_back(Position(x[i], y[i]));
+			// 추가 부분 (내 마지막 착수 위치 저장)
+			myx[i] = x[i];
+			myy[i] = y[i];
 		}
 		else {
 			setLine("ERROR 이미 돌이 있는 위치입니다. MY[%d, %d]", x[i], y[i]);
@@ -259,7 +249,9 @@ void opmove(int x[], int y[], int cnt) {
 		if (isFree(x[i], y[i])) {
 			board[x[i]][y[i]] = 2;
 
-			enemyLog.push_back(Position(x[i], y[i]));
+			// 추가 부분 (상대방의 마지막 착수 위치 저장)
+			opx[i] = x[i];
+			opy[i] = y[i];
 		}
 		else {
 			setLine("ERROR 이미 돌이 있는 위치입니다. OP[%d, %d]", x[i], y[i]);
@@ -272,3 +264,4 @@ void block(int x, int y) {
 		board[x][y] = 3;
 	}
 }
+
