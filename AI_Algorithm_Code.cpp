@@ -26,384 +26,306 @@ void domymove(int x[], int y[], cnt) : 둘 돌들의 좌표를 저장해서 출력
 //int board[BOARD_SIZE][BOARD_SIZE]; 바둑판 현재상황 담고 있어 바로사용 가능함. 단, 원본데이터로 수정 절대금지
 // 놓을수 없는 위치에 바둑돌을 놓으면 실격패 처리.
 
-boolean isFree(int x, int y) : 현재 [x,y]좌표에 바둑돌이 있는지 확인하는 함수 (없으면 true, 있으면 false)
+boolean ifFree(int x, int y) : 현재 [x,y]좌표에 바둑돌이 있는지 확인하는 함수 (없으면 true, 있으면 false)
 int showBoard(int x, int y) : [x, y] 좌표에 무슨 돌이 존재하는지 보여주는 함수 (1 = 자신의 돌, 2 = 상대의 돌, 3 = 블럭킹)
 
 
 <-------AI를 작성하실 때, 같은 이름의 함수 및 변수 사용을 권장하지 않습니다----->
 */
 
-#include <iostream>
+#include <stdio.h>
 #include <Windows.h>
 #include <time.h>
 #include "Connect6Algo.h"
-#include <string>
-#include <vector>
-#include <queue>
-#include <unordered_map>
-
-using namespace std;
 
 // "샘플코드[C]"  -> 자신의 팀명 (수정)
 // "AI부서[C]"  -> 자신의 소속 (수정)
 // 제출시 실행파일은 반드시 팀명으로 제출!
-char info[] = { "TeamName:모자란 녀석들,Department:KOREATECH" };
+char info[] = { "TeamName:1234567890,Department:AI부서[C]" };
 
-// 내가 마지막으로 착수한 돌의 위치 (-1로 초기화)
-int myx[2] = { -1, -1 }, myy[2] = { -1, -1 };
+using namespace std;
 
-// 상대방이 마지막으로 착수한 돌의 위치 (-1로 초기화)
-int opx[2] = { -1, -1 }, opy[2] = { -1, -1 };
-
-// (가중치, (x좌표, y좌표))를 나타내는 자료형 valued_point 정의
-// first: 가중치, second.first: x 좌표, second.second: y 좌표
-typedef pair<int, pair<int, int>> valued_point;
-
-// 최적의 수의 가중치와 좌표(순서쌍)를 저장하는 우선순위 큐
-priority_queue<valued_point> myQueue;
-
-void checkAround(int px, int py);
-int setPriority(string s);
-void debugPrint();		// 우선순위 큐 디버그용
+vector<Position> myLog;
+vector<Position> enemyLog;
+double inclination;
+int virtualBoard[19][19];
 
 void myturn(int cnt) {
 
 	int x[2], y[2];
 
+	// 이 부분에서 알고리즘 프로그램(AI)을 작성하십시오. 기본 제공된 코드를 수정 또는 삭제하고 본인이 코드를 사용하시면 됩니다.
+	// 현재 Sample code의 AI는 Random으로 돌을 놓는 Algorithm이 작성되어 있습니다.
+
 	srand((unsigned)time(NULL));
 
-	if (cnt == 1) {		// 첫 수일 경우 정가운데 3x3 중 랜덤으로 착수
-		while (true) {
-			x[0] = 8 + (rand() % 3);
-			y[0] = 8 + (rand() % 3);
-			if (isFree(x[0], y[0])) break;
+	FILE *file_pointer;
+	file_pointer = fopen("C:\\Users\\노유찬\\Desktop\\육목\\Version\\2018_08_09\\log.txt", "a");
+
+	if (cnt == 1) {
+		x[0] = 9; y[0] = 9;
+
+		while (!isFree(x[0], y[0])) {		
+			int sign = rand() % 2;			
+
+			if (sign == 1) {						
+				x[0] += rand() % 2;
+				y[0] += rand() % 2;
+			}
+			else {							
+				x[0] -= rand() % 2;
+				y[0] -= rand() % 2;
+			}
 		}
 	}
-	else {				// 첫 수를 제외한 모든 경우
-		if (opx[1] == -1 && opy[1] == -1) {		// 다음 착수자의 첫 수일 경우
-			while (true) {
-				x[0] = opx[0] - 1 + (rand() % 3);
-				y[0] = opy[0] - 1 + (rand() % 3);
-				if (isFree(x[0], y[0])) break;
-			}
-			while (true) {
-				switch (rand() % 4) {
-				case 0:
-					x[1] = x[0] - 1;
-					y[1] = y[0];
-					break;
-				case 1:
-					x[1] = x[0];
-					y[1] = y[0] - 1;
-					break;
-				case 2:
-					x[1] = x[0] + 1;
-					y[1] = y[0];
-					break;
-				case 3:
-					x[1] = x[0];
-					y[1] = y[0] + 1;
-					break;
-				}
-
-				if (((opx[0] == x[0]) && (x[0] == x[1])) || ((opy[0] == y[0]) && (y[0] == y[1]))) continue;
-				if (isFree(x[1], y[1])) break;
-			}
-		}
-		else {		// 그 외의 모든 경우
-			checkAround(myx[0], myy[0]);
-			checkAround(myx[1], myy[1]);
-			checkAround(opx[0], opy[0]);
-			checkAround(opx[1], opy[1]);
-
-			debugPrint();		// 우선순위 큐 디버그용
-
-			valued_point candidate;
-			for (int i = 0; i < cnt; i++) {
-				candidate = myQueue.top();
-				myQueue.pop();
-				x[i] = candidate.second.first;
-				y[i] = candidate.second.second;
-
-				if (!isFree(x[i], y[i]) || ((x[0] == x[1]) && (y[0] == y[1]))) i--;
-				if (terminateAI) return;
-			}
-
-			valued_point vp;
-
+	else {
+		for(int i=0; i<cnt; i++) {
+			Node *solution = yukmok();
+			x[i] = solution->getX();
+			y[i] = solution->getY();
 		}
 	}
 
-	// 디버그용
-	char dd[200] = { " " };
-	sprintf_s(dd, "--- opx[0]: %d, opy[0]: %d, opx[1]: %d, opy[1]: %d ---\n", opx[0], opy[0], opx[1], opy[1]);
-	writeLog(dd);
-
-	//while (!myQueue.empty())
-	//	myQueue.pop();
-
+	for (int i = 0; i < width; i++) {
+		for (int j = 0; j < height; j++) {
+			fprintf(file_pointer, "%d ", virtualBoard[j][i]);
+		}
+		fprintf(file_pointer, "\n");
+	}
+	fprintf(file_pointer, "\n\n");
+	
 	// 이 부분에서 자신이 놓을 돌을 출력하십시오.
 	// 필수 함수 : domymove(x배열,y배열,배열크기)
 	// 여기서 배열크기(cnt)는 myturn()의 파라미터 cnt를 그대로 넣어야합니다.
 	domymove(x, y, cnt);
 }
 
-// 특정 돌의 8 방향을 문자열화하여 각 라인을 검사, 돌을 놓을 좌표의 우선순위를 선정하는 함수
-void checkAround(int px, int py) {
-	string str = "";
-	valued_point pos;		// 검사할 돌의 가중치(value)와 좌표 순서쌍 (x, y)
-	unordered_map<string, int> tokens;
-	vector<valued_point> tempQueue;		// 각 좌표와 가중치를 임시 저장하는 큐
+Node* yukmok() {
+	// 출력용 virtualBoard
+	for (int i = 0; i < width; i++) {
+		for (int j = 0; j < height; j++) {
+			virtualBoard[i][j] = showBoard(i, j);
+		}
+	}
 
-	int firstIndex = 0, lastIndex = 0;
-	int x_begin = -1, y_begin = -1;
+	// 마지막으로 뒀던 수를 기반으로 MCTS
+	Position &p = myLog.back();
+	myLog.pop_back();
+	Node *root = new Node(p.getX(), p.getY());
+	root->setUnit(showBoard(p.getX(), p.getY()));
+	virtualBoard[p.getX()][p.getY()] = showBoard(p.getX(), p.getY());
+	return MCTS(root);
+}
 
-	if (px == -1 && py == -1) return;
+Node* MCTS(Node* root) {
+	int turn = -1, count = 2;
+	if (root->getUnit() == 1) {
+		turn = 1; count = 1;
+	}
+	Node *child = new Node();
+	for (int i = 0; i < 50; i++) {
+		child = selection(root, &turn, &count);
+		int simulation_result = simulation(child);
+		backpropagate(child, simulation_result);
+	}
 
-	// 상/하(0) -> 좌상/우하(1) -> 좌/우(2) -> 좌하/우상(3) 순으로 검사
-	for (int incl = 0; incl < 4; incl++) {
-		switch (incl) {
-		case 0:		// 상 -> 하
-			x_begin = px;
-			y_begin = 0;
+	return best_child(root->child);
+}
 
-			for (int i = 0; i < height; i++)
-				str.append(to_string(showBoard(px, i)));
-			break;
-		case 1:		// 좌상 -> 우하
-			if (px > py) {
-				x_begin = px - py;
-				y_begin = 0;
+Node* selection(Node* node, int *turn, int *count) {
+	// 자식 노드를 최대한 만든다.
+	while (non_terminal(node)) {
+		if (!fully_expanded(node)) {
+			node = expand(node, turn, count);
+		}
+		else {
+			node = best_child(node->child);
+		}
+	}
+	
+	// 자식노드를 다 만들면 방문하지 않은 자식노드를 찾아서 반환한다.
+	return pick_unvisited(node->child);
+}
+
+// root가 들어오면 Tree를 구성하도록 함
+Node* expand(Node *node, int *turn, int *count) {
+	for (int y = node->getY() - 1; y <= node->getY() + 1; y++) {
+		for (int x = node->getX() - 1; x <= node->getX() + 1; x++) {
+			// 확장 중에서 중복 방지
+			bool overlap = false;
+			for (Node *p : node->child) {
+				if (x == p->getX() && y == p->getY()) overlap = true;
+			}
+			if (overlap) continue;
+
+			// 중복 아닌 자식 노드는 추가됨
+			int pos = showBoard(x, y);
+			Node *child = new Node(x, y);
+
+			node->setChild(child);
+			child->setParent(node);
+
+			if (*count == 0) {
+				*turn *= -1;
+				*count = 2;
+			}
+
+			if (pos == 0) {
+				if (*turn == 1) {
+					child->setUnit(1);
+					virtualBoard[x][y] = 1;
+				}
+				else {
+					child->setUnit(2);
+					virtualBoard[x][y] = 2;
+				}
+			}
+			else if (pos == 1) {
+				child->setUnit(1);
+			}
+			else if (pos == 2) {
+				child->setUnit(2);
 			}
 			else {
-				x_begin = 0;
-				y_begin = py - px;
-			}
-
-			for (int i = 0; i < height - abs(px - py); i++)
-				if (px > py)	// 대각선 위
-					str.append(to_string(showBoard((px - py) + i, i)));
-				else			// 대각선 아래
-					str.append(to_string(showBoard(i, (py - px) + i)));
-			break;
-		case 2:		// 좌 -> 우
-			x_begin = 0;
-			y_begin = py;
-
-			for (int i = 0; i < width; i++)
-				str.append(to_string(showBoard(i, py)));
-			break;
-		case 3:		// 좌하 -> 우상
-			if (px + py < height) {		// 대각선 위
-				x_begin = 0;
-				y_begin = px + py;
-
-				for (int i = 0; i < (px + py + 1); i++)
-					str.append(to_string(showBoard(i, (px + py) - i)));
-			}
-			else {						// 대각선 아래
-				x_begin = (px + py) - height + 1;
-				y_begin = height - 1;
-				for (int i = 0; i < (height * 2 - (px + py + 1)); i++)
-					str.append(to_string(showBoard((px + py) - height + 1 + i, height - 1 - i)));
-			}
-			break;
-		}
-
-		// 디버그용
-		fp = fopen("myLog.txt", "a");
-		if (fp != NULL) {
-			string tmp = to_string(incl) + string(" : ") + str;
-			fprintf(fp, tmp.c_str());
-			fprintf(fp, "\n");
-		}
-		fclose(fp);
-
-		// 문자열 토큰화
-		while (true) {
-			firstIndex = str.find("0", lastIndex);
-			lastIndex = str.find("0", firstIndex + 1);
-
-			if (lastIndex == -1) lastIndex = str.size() - 1;
-			if (lastIndex - firstIndex > 1) {
-				string temp = str.substr(firstIndex, lastIndex - firstIndex + 1);
-				//tokens.push_back(temp);
-				tokens.emplace(make_pair(temp, firstIndex));
-			}
-
-			if (lastIndex == str.size() - 1) break;
-		}
-		firstIndex = 0, lastIndex = 0;
-
-		for (auto s : tokens) {
-			int value = setPriority(s.first);
-			int qx[2] = { -1, -1 }, qy[2] = { -1, -1 };
-
-			for (int i = 0; i < 2; i++) {
-				fp = fopen("myLog.txt", "a");
-				if (fp != NULL) {
-					string ss = string("<") + s.first + string(", ") + to_string(s.second) + string("> ");
-					fprintf(fp, ss.c_str());
+				if (*turn == 1) {
+					child->setUnit(1);
 				}
-				fclose(fp);
-
-				switch (incl) {
-				case 0:		// 상 -> 하
-					qx[i] = x_begin;
-					if (i == 0) qy[i] = s.second;
-					else qy[i] = s.second + s.first.size() - 1;
-					break;
-				case 1:		// 좌상 -> 우하
-					if (i == 0) {
-						qx[i] = x_begin + s.second;
-						qy[i] = y_begin + s.second;
-					}
-					else {
-						qx[i] = x_begin + s.second + s.first.size() - 1;
-						qy[i] = y_begin + s.second + s.first.size() - 1;
-					}
-					break;
-				case 2:		// 좌 -> 우
-					if (i == 0) qx[i] = s.second;
-					else qx[i] = s.second + s.first.size() - 1;
-					qy[i] = y_begin;
-					break;
-				case 3:		// 좌하 -> 우상
-					if (i == 0) {
-						qx[i] = x_begin + s.second;
-						qy[i] = y_begin - s.second;
-					}
-					else {
-						qx[i] = x_begin + s.second + s.first.size() - 1;
-						qy[i] = y_begin - (s.second + s.first.size() - 1);
-					}
-					break;
+				else {
+					child->setUnit(2);
 				}
-
-				pos = make_pair(value, make_pair(qx[i], qy[i]));
-				tempQueue.push_back(pos);
-
-				fp = fopen("myLog.txt", "a");
-				if (fp != NULL) {
-					string ss = s.first + string(":") + to_string(pos.first) + string("_(") + to_string(pos.second.first) + string(",") + to_string(pos.second.second) + string(")  ");
-					fprintf(fp, ss.c_str());
-				}
-				fclose(fp);
-
 			}
 		}
-		writeLog("\n");
-		str.clear();			// 문자열 초기화
-		tokens.clear();			// 토큰 임시 저장 큐 초기화
 	}
-	
-	while (!myQueue.empty()) {
-		tempQueue.push_back(myQueue.top());
-		myQueue.pop();
+	*count -= 1;
+	return node;
+}
+
+Node* pick_unvisited(vector<Node*> child) {
+	// 방문하지 않은 자식 노드 찾기
+	for (Node *p : child) {
+		if (p->getCount() == 0) return p;
+	}
+}
+
+bool fully_expanded(Node* node) {
+	// 확장 최대크기 지정
+	if (node->child.size() == 8) return true;
+	else return false;
+}
+
+bool non_terminal(Node *node) {
+	return is_gameEnd(node);
+}
+
+int simulation(Node *node) {
+	while (non_terminal(node)) {
+		node = policy(node);
 	}
 
-	fp = fopen("myLog.txt", "a");
-	string ss = "";
+	return result(node);
+}
 
-	// 가중치 가산이 끝난 임시 저장 큐의 모든 원소를 정리(압축) 후 우선순위 큐로 이동
+Node* pick_random(vector<Node*> child) {
+	// 랜덤 시뮬을 위해
+	srand((unsigned)time(NULL));
+	return child[rand() % child.size()];
+}
+
+// 가능하면 유망한 것을 찾아야 할듯
+Node* policy(Node *node) {
+	return pick_random(node->child);
+}
+
+void backpropagate(Node* node, int result) {
+	// 마지막에 게임이 끝난 부분에서 root 까지 올라가면서 result를 부여해준다.
+	if (node->getParent() == nullptr) return;
+	node->update(result);
+	backpropagate(node->getParent(), result);
+}
+
+Node* best_child(vector<Node*> child, double cnode_parameter) {
+	double maxVal = 0.0;
+
+	// weight가 가장 높은 자식노드를 선택
+	for (Node *c : child) {
+		c->setWeight((c->getWin() / c->getCount()) + cnode_parameter * sqrt((2 * log(c->getCount())) / c->getCount()));
+
+		if (maxVal < c->getWeight()) {
+			maxVal = c->getWeight();
+		}
+	}
+
+	for (Node *c : child) {
+		if (maxVal == c->getWeight()) {
+			return c;
+		}
+	}
+}
+
+bool is_gameEnd(Node* node) {
+	return result(node) == 1;
+}
+
+
+int result(Node* node) {
+
+	if (checkSix(node, 1, 1) || checkSix(node, -1, 1) || checkSix(node, 0, 1) || checkSix(node, 1, 0)) {
+		return 1;
+	}
+	return 0;
+}
+
+bool checkSix(Node* node, int incX, int incY) {
+	int pos = node->getUnit();;
+	int x = node->getX();
+	int y = node->getY();
+	int six = 1;
 	
-	valued_point tempPoint;
-	vector<int> ban;
-	int newValue, nx, ny;
-	for (int i = 0; i < tempQueue.size(); i++) {
-		tempPoint = tempQueue.at(i);
-		newValue = tempPoint.first;
-		bool isDuplicated = false, isBanned = false;
-
-		for (auto a : ban) {
-			if (i == a) {
-				isBanned = true;
-				break;
-			}
+	while (true) {
+		if (showBoard(x + incX, y + incY) == pos) six++;
+		else if (showBoard(x - incX, y - incY) == pos) six++;
+		
+		if (six > 6) return false;
+		else {
+			if (six == 6) return true;
 		}
-		if (isBanned) continue;
+	}
+}
 
-		ss = string("[") + to_string(tempPoint.first) + string("_(") + to_string(tempPoint.second.first) + string(",") + to_string(tempPoint.second.second) + string(")") + string("]  ");
-		fprintf(fp, ss.c_str());
 
-		for (int j = i + 1; j < tempQueue.size(); j++) {
-			valued_point s = tempQueue.at(j);
-			if (s != tempQueue.at(i)) {
-				ss = to_string(s.first) + string("_(") + to_string(s.second.first) + string(",") + to_string(s.second.second) + string(")  ");
-				fprintf(fp, ss.c_str());
-
-				if (tempPoint.second.first == s.second.first && tempPoint.second.second == s.second.second) {
-					for (auto a : ban) {
-						if (j == a) {
-							isBanned = true;
-							break;
-						}
-					}
-					
-					if (!isBanned) {
-						fprintf(fp, "<-  ");
-
-						isDuplicated = true;
-						newValue += s.first;
-						nx = tempPoint.second.first;
-						ny = tempPoint.second.second;
-
-						ban.push_back(j);
-					}
-				}
-			}
+// sub function
+bool empty(int pos) {
+	for (int i = 0; i < width; i++) {
+		for (int j = 0; j < height; j++) {
+			if (showBoard(i, j) == pos) return false;
+			return true;
 		}
-		if (isDuplicated)
-			myQueue.push(make_pair(newValue, make_pair(nx, ny)));
+	}
+}
+
+bool line_check(int bx, int by, int cx, int cy, int level) {
+	bool check = false;
+
+	// level이 2 이하면 돌을 2개째 검사하는 것을 의미
+	if (level <= 2) {
+		if ((cx - bx) == 0)
+			inclination = 10000.0;	// 분모가 0 인 경우
 		else
-			myQueue.push(tempPoint);
+			inclination = (cy - by) / (cx - bx);
 
-		fprintf(fp, "\n");
+		if (inclination == 0.0 || inclination == 1.0 || inclination == -1.0 || inclination == 10000.0) check = true;
+	}
+	else if (level > 2) {
+		double temp;
+		if ((cx - bx) == 0)
+			temp = 10000.0;
+		else
+			temp = (cy - by) / (cx - bx);
+
+		if (inclination == temp) check = true;
 	}
 
-	fclose(fp);
+	return check;
 }
 
-// 문자열 토큰의 검사하여 가중치를 부여하는 함수
-int setPriority(string s) {
-	int value;
 
-	// 가중치 부여
-	if (s == "010")				value = 20;
-	else if (s == "0110")		value = 100;
-	else if (s == "01110")		value = 500;
-	else if (s == "011110")		value = 2000;
-	else if (s == "0111110")	value = 10000;
-	else if (s == "020")		value = 10;
-	else if (s == "0220")		value = 50;
-	else if (s == "02220")		value = 200;
-	else if (s == "022220")		value = 1000;
-	else if (s == "0222220")	value = 5000;
-	else						value = 0;
-
-	return value;
-}
-
-// 우선순위 큐 디버그용
-void debugPrint() {
-	vector<valued_point> vp;
-	string tmp;
-
-	while (!myQueue.empty()) {
-		vp.push_back(myQueue.top());
-		myQueue.pop();
-	}
-
-	fp = fopen("myLog.txt", "a");
-	fprintf(fp, "debug: ");
-	for (auto a : vp) {
-		if (fp != NULL) {
-			tmp = to_string(a.first) + string("_(") + to_string(a.second.first) + string(", ") + to_string(a.second.second) + string(")   ");
-			fprintf(fp, tmp.c_str());
-		}
-		myQueue.push(a);
-	}
-	if (fp != NULL)
-		fprintf(fp, "\n");
-	fclose(fp);
-}
