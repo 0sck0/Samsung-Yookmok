@@ -44,6 +44,8 @@ int center_x, center_y;		// 중심이 되는 x, y 좌표 값
 int tracker[19][19];
 std::vector<int> mustDo;
 std::vector<Position> promPos;
+int myZeroCount = 0;
+int enemyZeroCount = 0;
 
 void myturn(int cnt) {
 
@@ -98,9 +100,9 @@ void myturn(int cnt) {
 	
 	for (int k = 0; k < cnt; k++) {
 		if (mustDo.size() > 0) {
-			x[k] = mustDo.back();
-			mustDo.pop_back();
 			y[k] = mustDo.back();
+			mustDo.pop_back();
+			x[k] = mustDo.back();
 			mustDo.pop_back();
 		}
 		else {
@@ -153,6 +155,7 @@ void checkMyWin() {
 					tracker[i][j] = 0;				// 초기화
 				}
 			}
+			myZeroCount = 0;
 
 			checkMyPromising(curX, curY, 1);
 		}
@@ -164,11 +167,12 @@ void checkMyPromising(int curX, int curY, int level) {
 		for (int x = curX - 1; x <= curX + 1; x++) {
 			for (int y = curY - 1; y <= curY + 1; y++) {
 				int pos = showBoard(x, y);
-				bool line = lineCheck(curX, curY, x, y, level);
+				bool line = lineCheck(curX, curY, x, y, level + 1);
 
 				if ((x == curX && y == curY) || tracker[x][y] == 1) continue;
 
 				// 본격적인 검사
+				if (promPos.size() >= 3) { promPos.clear(); return; }
 				if (line) { 
 					if (level == 6) {
 						for (Position &p : promPos) {
@@ -179,6 +183,8 @@ void checkMyPromising(int curX, int curY, int level) {
 					else {
 						if (pos == 0 && promPos.size() < 2) {
 							promPos.push_back(Position(x, y));
+							if (myZeroCount > 2)  return;
+							myZeroCount++;
 							checkMyPromising(x, y, level + 1);
 						}
 						else if (pos == 1 || pos == 3) {
@@ -210,6 +216,7 @@ void checkEnemyWin() {
 					tracker[i][j] = 0;				// 초기화
 				}
 			}
+			enemyZeroCount = 0;
 
 			checkEnemyPromising(curX, curY, 1);
 		}
@@ -221,11 +228,12 @@ void checkEnemyPromising(int curX, int curY, int level) {
 		for (int x = curX - 1; x <= curX + 1; x++) {
 			for (int y = curY - 1; y <= curY + 1; y++) {
 				int pos = showBoard(x, y);
-				bool line = lineCheck(curX, curY, x, y, level);
+				bool line = lineCheck(curX, curY, x, y, level + 1);
 
 				if ((x == curX && y == curY) || tracker[x][y] == 1) continue;
 
 				// 본격적인 검사
+				if (promPos.size() >= 3) { promPos.clear(); return; }
 				if (line) {
 					if (level == 6) {
 						for (Position &p : promPos) {
@@ -236,7 +244,9 @@ void checkEnemyPromising(int curX, int curY, int level) {
 					else {
 						if (pos == 0 && promPos.size() < 2) {
 							promPos.push_back(Position(x, y));
-							checkEnemyPromising(x, y, level + 1);
+							if (enemyZeroCount > 2)  return;
+							enemyZeroCount++;
+							checkMyPromising(x, y, level + 1);		
 						}
 						else if (pos == 2 || pos == 3) {
 							checkEnemyPromising(x, y, level + 1);
