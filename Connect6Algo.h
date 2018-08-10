@@ -64,5 +64,4 @@ void set_opposition(int x, int y);
 void check();
 void checkMyWin();
 void checkEnemyWin();
-void checkMyPromising(int curX, int curY, int level);
-void checkEnemyPromising(int curX, int curY, int level);
+bool checkSix(int x, int y, int incX, int incY);
